@@ -15,7 +15,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.block.Block;
 import org.bukkit.block.CommandBlock;
 import org.bukkit.command.Command;
-import org.bukkit.command.CommandMap;
+import org.bukkit.command.SimpleCommandMap;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -45,7 +45,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
 
     private final CommandBlockPermissions plugin;
     private final Constructor<?> packetDataSerializer;
-    private final CommandMap bukkitCommandMap;
+    private final SimpleCommandMap bukkitCommandMap;
     private Field b = null;
 
     public CommandBlockPacketListener(CommandBlockPermissions plugin) throws ClassNotFoundException, NoSuchMethodException, NoSuchFieldException, IllegalAccessException {
@@ -58,7 +58,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
 
         Field commandMapField = plugin.getServer().getClass().getDeclaredField("commandMap");
         commandMapField.setAccessible(true);
-        bukkitCommandMap = (CommandMap) commandMapField.get(plugin.getServer());
+        bukkitCommandMap = (SimpleCommandMap) commandMapField.get(plugin.getServer());
     }
 
     @Override
@@ -141,18 +141,18 @@ public class CommandBlockPacketListener extends PacketAdapter {
                 String[] commandArray = checkCommandString.split(" ");
                 String commandName;
                 Command command;
-                boolean hasPerm = event.getPlayer().hasPermission("cbp.perm.*");
+                boolean hasPerm = true;
                 List<String> deniedCommands = new ArrayList<>();
                 do {
                     commandName = commandArray[0];
-                    command = bukkitCommandMap.getCommand(commandArray[0]);
+                    command = bukkitCommandMap.getCommand(commandName);
                     if (command != null) {
                         boolean tempHasPerm = plugin.usePlayerPermissions() &&
                                 event.getPlayer().hasPermission(command.getPermission())
                                 && !event.getPlayer().hasPermission("-cbp.perm." + command.getPermission())
                                 || event.getPlayer().hasPermission("cbp.perm." + command.getPermission());
                         if (!tempHasPerm) deniedCommands.add(commandName);
-                        hasPerm = hasPerm && tempHasPerm;
+                        hasPerm = hasPerm && tempHasPerm || event.getPlayer().hasPermission("cbp.perm.*");
                         if ("execute".equalsIgnoreCase(command.getName())) {
                             int executeCommandLen = 5;
                             if ("detect".equalsIgnoreCase(commandArray[5]) && commandArray.length > 11) {
@@ -315,6 +315,6 @@ public class CommandBlockPacketListener extends PacketAdapter {
     public enum Channel {
         MC_AdvCmd,
         MC_AdvCdm,
-        MC_AutoCmd;
+        MC_AutoCmd
     }
 }
