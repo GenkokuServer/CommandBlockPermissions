@@ -12,10 +12,9 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.EncoderException;
 import org.bukkit.ChatColor;
-import org.bukkit.block.Block;
-import org.bukkit.block.CommandBlock;
 import org.bukkit.command.Command;
 import org.bukkit.command.SimpleCommandMap;
+import org.bukkit.scheduler.BukkitScheduler;
 
 import java.io.IOException;
 import java.lang.reflect.Constructor;
@@ -105,6 +104,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
             }
         }
 
+        List<String> message = new ArrayList<>();
         int x = 0;
         int y = 0;
         int z = 0;
@@ -166,7 +166,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
                 } while ("execute".equalsIgnoreCase(commandName));
                 if (!hasPerm) {
                     plugin.warning(event.getPlayer().getName() + " doesn't have the permission to set the command '" + commandString + "'!");
-                    event.getPlayer().sendMessage(ChatColor.RED + "You don't have the permission to set the command " + deniedCommands + " in Command " + (minecart ? "Minecarts" : "Blocks") + "!");
+                    message.add(ChatColor.RED + "You don't have the permission to set the command " + deniedCommands + " in Command " + (minecart ? "Minecarts" : "Blocks") + "!");
                     commandString = "cbp disabled " + event.getPlayer().getName() + " " + commandString;
                 }
             }
@@ -174,12 +174,12 @@ public class CommandBlockPacketListener extends PacketAdapter {
             String optPerm = "cbp.options.";
 
             if (!trackOutput && !event.getPlayer().hasPermission(optPerm + "disabletrackoutput")) {
-                event.getPlayer().sendMessage(ChatColor.RED + "You don't have the permission to disable tracking of the output!");
+                message.add(ChatColor.RED + "You don't have the permission to disable tracking of the output!");
                 trackOutput = true;
             }
 
             if (!event.getPlayer().hasPermission(optPerm + "mode." + mode.toString().toLowerCase())) {
-                event.getPlayer().sendMessage(ChatColor.RED + "You don't have the permission to use the " + mode.getName() + "(" + mode.toString().toLowerCase() + ") mode!");
+                message.add(ChatColor.RED + "You don't have the permission to use the " + mode.getName() + "(" + mode.toString().toLowerCase() + ") mode!");
                 CommandBlockMode oldMode = mode;
                 for (CommandBlockMode m : CommandBlockMode.values()) {
                     if (m == mode) {
@@ -198,54 +198,45 @@ public class CommandBlockPacketListener extends PacketAdapter {
             }
 
             if (isConditional && !event.getPlayer().hasPermission(optPerm + "conditional")) {
-                event.getPlayer().sendMessage(ChatColor.RED + "You don't have the permission to use the conditional mode!");
+                message.add(ChatColor.RED + "You don't have the permission to use the conditional mode!");
                 isConditional = false;
             }
 
             event.getPlayer().setOp(wasOP);
         }
 
-        if (plugin.getServer().spigot().getConfig().getBoolean("settings.bungeecord")) {
-            // BungeeCord seems to have an issue with some packet that the server sends
-            // after manipulating the command block packet? Not sure why 'though, it works
-            // fine without BungeeCord. Lets work around it anyways.
+        ByteBuf out = Unpooled.buffer();
 
-            // Fuck this shit, there is no CommandBlock api in Bukkit ;_;
-            event.setCancelled(true);
-            if (minecart) {
-
-            } else {
-                Block block = event.getPlayer().getWorld().getBlockAt(x, y, z);
-                CommandBlock cb = (CommandBlock) block.getState();
-            }
-
-        } else {
-            ByteBuf out = Unpooled.buffer();
-
-            if (!autoCmd) {
-                out.writeByte(minecart ? 1 : 0);
-            }
-
-            if (minecart) {
-                out.writeInt(entityId);
-            } else {
-                out.writeInt(x);
-                out.writeInt(y);
-                out.writeInt(z);
-            }
-            writeString(commandString, out);
-            out.writeBoolean(trackOutput);
-            if (autoCmd) {
-                writeString(mode.toString(), out);
-                out.writeBoolean(isConditional);
-                out.writeBoolean(automatic);
-            }
-
-            Object data = packetDataSerializer.newInstance(out);
-
-            b.set(event.getPacket().getHandle(), data);
+        if (!autoCmd) {
+            out.writeByte(minecart ? 1 : 0);
         }
+
+        if (minecart) {
+            out.writeInt(entityId);
+        } else {
+            out.writeInt(x);
+            out.writeInt(y);
+            out.writeInt(z);
+        }
+        writeString(commandString, out);
+        out.writeBoolean(trackOutput);
+        if (autoCmd) {
+            writeString(mode.toString(), out);
+            out.writeBoolean(isConditional);
+            out.writeBoolean(automatic);
+        }
+
+        Object data = packetDataSerializer.newInstance(out);
+
+        b.set(event.getPacket().getHandle(), data);
+
+        BukkitScheduler scheduler = plugin.getServer().getScheduler();
+        scheduler.scheduleSyncDelayedTask(plugin, () -> {
+            for (String m : message)
+                event.getPlayer().sendMessage(m);
+        }, 20L);
     }
+
 
     private String readString(ByteBuf buf) throws IOException {
         int maxLength = Short.MAX_VALUE;
