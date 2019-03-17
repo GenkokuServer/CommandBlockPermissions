@@ -14,3 +14,5 @@ usePlayerPermissions: false
 # resolver which this plugin can't check for.
 # Use cbp.perm.<commandpermission> to allow players only access
 # to certain commands in command blocks!
+
+disableWorlds: []

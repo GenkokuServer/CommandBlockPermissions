@@ -63,6 +63,8 @@ public class CommandBlockPacketListener extends PacketAdapter {
     @Override
     public void onPacketReceiving(PacketEvent event) {
         try {
+            if (plugin.getDisableWorlds().contains(event.getPlayer().getWorld().getName())) return;
+
             Channel channel = Channel.valueOf(event.getPacket().getStrings().read(0).replace('|', '_'));
 
             if (b == null) {
@@ -91,12 +93,12 @@ public class CommandBlockPacketListener extends PacketAdapter {
             }
         } catch (IllegalArgumentException ignored) {
             // Not a channel we want to listen on
-        } catch (NoSuchFieldException | IllegalAccessException | IOException | InstantiationException | InvocationTargetException e) {
+        } catch (NoSuchFieldException | IllegalAccessException | InstantiationException | InvocationTargetException e) {
             e.printStackTrace();
         }
     }
 
-    private void handlePluginMessage(PacketEvent event, ByteBuf buf, boolean autoCmd, boolean minecart) throws IllegalAccessException, IOException, InvocationTargetException, InstantiationException {
+    private void handlePluginMessage(PacketEvent event, ByteBuf buf, boolean autoCmd, boolean minecart) throws IllegalAccessException, InvocationTargetException, InstantiationException {
         if (!event.getPlayer().isOp() || plugin.checkOps()) {
             if (!event.getPlayer().hasPermission("cbp.commandblock.change")) {
                 event.setCancelled(true);
@@ -139,11 +141,13 @@ public class CommandBlockPacketListener extends PacketAdapter {
                     checkCommandString = checkCommandString.substring(1);
                 }
                 String[] commandArray = checkCommandString.split(" ");
+                String[] beforeCommandArray;
                 String commandName;
                 Command command;
                 boolean hasPerm = true;
                 List<String> deniedCommands = new ArrayList<>();
                 do {
+                    beforeCommandArray = commandArray;
                     commandName = commandArray[0];
                     command = bukkitCommandMap.getCommand(commandName);
                     if (command != null) {
@@ -153,7 +157,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
                                 || event.getPlayer().hasPermission("cbp.perm." + command.getPermission());
                         if (!tempHasPerm) deniedCommands.add(commandName);
                         hasPerm = hasPerm && tempHasPerm || event.getPlayer().hasPermission("cbp.perm.*");
-                        if ("execute".equalsIgnoreCase(command.getName())) {
+                        if (commandArray.length > 5 && "execute".equalsIgnoreCase(command.getName())) {
                             int executeCommandLen = 5;
                             if ("detect".equalsIgnoreCase(commandArray[5]) && commandArray.length > 11) {
                                 executeCommandLen = 11;
@@ -163,7 +167,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
                     } else {
                         plugin.getLogger().log(Level.WARNING, "Failed to check permissions for command '" + (commandString.length() > 210 ? commandString.substring(0, 200) + "..." : commandString) + "'!");
                     }
-                } while ("execute".equalsIgnoreCase(commandName));
+                } while ("execute".equalsIgnoreCase(commandName) && beforeCommandArray.length > 5);
                 if (!hasPerm) {
                     plugin.warning(event.getPlayer().getName() + " doesn't have the permission to set the command '" + commandString + "'!");
                     message.add(ChatColor.RED + "You don't have the permission to set the command " + deniedCommands + " in Command " + (minecart ? "Minecarts" : "Blocks") + "!");
@@ -238,7 +242,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
     }
 
 
-    private String readString(ByteBuf buf) throws IOException {
+    private String readString(ByteBuf buf) {
         int maxLength = Short.MAX_VALUE;
         int length = readVarInt(buf);
 
@@ -272,7 +276,7 @@ public class CommandBlockPacketListener extends PacketAdapter {
         }
     }
 
-    private int readVarInt(ByteBuf buf) throws IOException {
+    private int readVarInt(ByteBuf buf) {
         int out = 0;
         int bytes = 0;
         byte in;

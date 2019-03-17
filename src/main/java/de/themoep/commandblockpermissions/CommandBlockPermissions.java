@@ -8,6 +8,7 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.List;
 import java.util.logging.Level;
 
 /**
@@ -33,6 +34,7 @@ public class CommandBlockPermissions extends JavaPlugin {
     private boolean logWarnings;
     private boolean checkOps;
     private boolean usePlayerPermissions;
+    private List<String> disableWorlds;
 
     public void onEnable() {
         protocolManager = ProtocolLibrary.getProtocolManager();
@@ -48,12 +50,13 @@ public class CommandBlockPermissions extends JavaPlugin {
 
     }
 
-    public void loadConfig() {
+    void loadConfig() {
         saveDefaultConfig();
         reloadConfig();
         logWarnings = getConfig().getBoolean("logWarnings");
         checkOps = getConfig().getBoolean("checkOps");
         usePlayerPermissions = getConfig().getBoolean("usePlayerPermissions");
+        disableWorlds = getConfig().getStringList("disableWorlds");
     }
 
     public void warning(String msg) {
@@ -67,7 +70,7 @@ public class CommandBlockPermissions extends JavaPlugin {
         }
     }
 
-    public String getPrefix() {
+    private String getPrefix() {
         return ChatColor.AQUA + "[" + ChatColor.YELLOW + "CBP" + ChatColor.AQUA + "]" + ChatColor.RESET;
     }
 
@@ -77,5 +80,9 @@ public class CommandBlockPermissions extends JavaPlugin {
 
     public boolean usePlayerPermissions() {
         return usePlayerPermissions;
+    }
+
+    public List<String> getDisableWorlds(){
+        return disableWorlds;
     }
 }
